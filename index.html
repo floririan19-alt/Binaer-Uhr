@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>Binär-Uhr — interaktiv</title>
+<style>
+  :root{
+    --ink:#1c2430;
+    --paper:#fbfaf7;
+    --panel:#ffffff;
+    --line:#1c2430;
+    --slate:#3a5a78;
+    --slate-dim:#e7edf2;
+    --hours:#4caf50;
+    --minutes:#e53935;
+    --seconds:#f4d03f;
+    --off:#ffffff;
+    --off-line:#c7ccd1;
+    --dot-size: clamp(28px, 7vw, 52px);
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0; padding:0;
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Segoe UI', Verdana, Arial, sans-serif;
+    height:100%;
+  }
+  .wrap{
+    max-width:1080px;
+    margin:0 auto;
+    padding:clamp(8px,2vh,20px) 12px clamp(10px,2vh,24px);
+  }
+
+  h1.title{
+    text-align:center;
+    font-family:'Arial Black', Arial, sans-serif;
+    letter-spacing:0.5px;
+    font-size:clamp(1.25em, 3.6vw, 2em);
+    margin:0 0 clamp(6px,1.2vh,10px);
+  }
+
+  .clock-row{
+    display:flex;
+    gap:clamp(8px,2vw,20px);
+    justify-content:center;
+    flex-wrap:wrap;
+  }
+  .panel{
+    background:var(--panel);
+    border:3px solid var(--line);
+    border-radius:16px;
+    padding:8px 10px 10px;
+    min-width:0;
+    flex:1 1 150px;
+    max-width:230px;
+  }
+  .panel h2{
+    text-align:center;
+    font-size:clamp(0.85em, 2vw, 1.1em);
+    margin:2px 0 6px;
+  }
+  .bit-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:6px;
+    margin:clamp(3px,0.9vh,10px) 0;
+  }
+  .dot{
+    width:var(--dot-size); height:var(--dot-size);
+    border-radius:50%;
+    border:2px solid var(--off-line);
+    background:var(--off);
+    cursor:pointer;
+    transition:transform .12s ease;
+    position:relative;
+  }
+  .dot:hover{ transform:scale(1.08); }
+  .dot.lit-hours{ background:var(--hours); border-color:#2f7d33; }
+  .dot.lit-minutes{ background:var(--minutes); border-color:#a52320; }
+  .dot.lit-seconds{ background:var(--seconds); border-color:#c7a417; }
+  .dot-placeholder{
+    width:var(--dot-size); height:var(--dot-size);
+  }
+  .place-label{
+    font-weight:800;
+    font-size:clamp(0.75em, 1.9vw, 1.1em);
+    min-width:16px;
+    text-align:center;
+  }
+
+  .readout{
+    text-align:center;
+    font-family:'Arial Black', Arial, sans-serif;
+    font-size:clamp(1.4em, 4.2vw, 2.4em);
+    margin:clamp(6px,1.6vh,16px) 0 2px;
+    letter-spacing:2px;
+  }
+  .readout .sep{ color:var(--slate); }
+  .readout.hidden-value span.digit{ visibility:hidden; }
+
+  .controls{
+    background:var(--slate-dim);
+    border-radius:14px;
+    padding:8px 14px 10px;
+    margin-top:clamp(8px,1.6vh,18px);
+  }
+  .mode-buttons{
+    display:flex; gap:8px; justify-content:center; flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+  button{
+    font-family:inherit;
+    font-size:clamp(0.75em, 1.7vw, 0.92em);
+    font-weight:700;
+    border:2px solid var(--slate);
+    background:var(--panel);
+    color:var(--slate);
+    padding:7px 14px;
+    border-radius:999px;
+    cursor:pointer;
+    min-height:34px;
+  }
+  button.active{ background:var(--slate); color:#fff; }
+  button:hover{ filter:brightness(0.97); }
+
+  .panel-body{ display:none; }
+  .panel-body.show{ display:block; }
+  .panel-body p{ font-size:clamp(0.72em, 1.6vw, 0.88em); margin:2px 0; }
+
+  .manual-inputs, .quiz-inputs{
+    display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap;
+  }
+  .manual-inputs label, .quiz-inputs label{ font-size:clamp(0.75em, 1.7vw, 0.9em); font-weight:600; }
+  input[type=number]{
+    width:52px; padding:6px 4px; font-size:1em; text-align:center;
+    border:2px solid var(--slate); border-radius:8px;
+    min-height:34px;
+  }
+
+  #quizFeedback{
+    text-align:center; margin-top:6px; font-weight:700; min-height:1.2em;
+    font-size:clamp(0.75em, 1.7vw, 0.92em);
+  }
+  .ok{ color:#2f7d33; }
+  .bad{ color:#a52320; }
+
+  #tooltip{
+    position:fixed;
+    background:var(--ink);
+    color:#fff;
+    padding:8px 12px;
+    border-radius:8px;
+    font-size:0.85em;
+    max-width:220px;
+    pointer-events:none;
+    opacity:0;
+    transition:opacity .1s ease;
+    z-index:50;
+  }
+  #tooltip.show{ opacity:1; }
+
+  .legend{
+    display:flex; justify-content:center; gap:18px; margin-top:2px; flex-wrap:wrap;
+    font-size:clamp(0.72em, 1.6vw, 0.9em); color:var(--slate);
+  }
+  .legend span{ display:inline-flex; align-items:center; gap:5px; }
+  .legend i{ width:11px; height:11px; border-radius:50%; display:inline-block; border:2px solid var(--line); }
+
+  /* Auf großen Bildschirmen (Beamer/Desktop) wieder etwas mehr Luft geben */
+  @media (min-width: 1000px) and (min-height: 750px){
+    :root{ --dot-size: 52px; }
+    .wrap{ padding:28px 20px 40px; }
+    h1.title{ margin-bottom:24px; }
+    .panel{ padding:18px 26px 26px; max-width:none; }
+    .controls{ padding:18px 22px; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1 class="title">Binär-Uhr</h1>
+
+  <div class="clock-row" id="clockRow"></div>
+
+  <div class="readout" id="readout"></div>
+  <div class="legend">
+    <span><i style="background:var(--hours)"></i>Stunden</span>
+    <span><i style="background:var(--minutes)"></i>Minuten</span>
+    <span><i style="background:var(--seconds)"></i>Sekunden</span>
+  </div>
+
+  <div class="controls">
+    <div class="mode-buttons">
+      <button id="btnLive" class="active">Live-Uhrzeit</button>
+      <button id="btnManual">Zeit selbst einstellen</button>
+      <button id="btnQuiz">Übungsmodus</button>
+    </div>
+
+    <div class="panel-body show" id="bodyLive">
+      <p style="text-align:center; margin:0; color:var(--slate);">Die Uhr zeigt die aktuelle Uhrzeit. Klicke auf eine Kugel, um ihren Wert zu sehen.</p>
+    </div>
+
+    <div class="panel-body" id="bodyManual">
+      <div class="manual-inputs">
+        <label>Stunden <input type="number" id="inH" min="0" max="23" value="12"></label>
+        <label>Minuten <input type="number" id="inM" min="0" max="59" value="0"></label>
+        <label>Sekunden <input type="number" id="inS" min="0" max="59" value="0"></label>
+        <button id="btnSetManual">Anzeigen</button>
+      </div>
+      <p style="text-align:center; color:var(--slate); margin-top:8px;">Stelle eine Uhrzeit ein und beobachte, welche Kugeln aufleuchten.</p>
+    </div>
+
+    <div class="panel-body" id="bodyQuiz">
+      <p style="text-align:center; margin:0 0 6px; color:var(--slate);">Die Kugeln zeigen eine zufällige Uhrzeit. Lies sie ab und trage sie ein!</p>
+      <div class="quiz-inputs">
+        <label>Std. <input type="number" id="qH" min="0" max="23"></label> :
+        <label>Min. <input type="number" id="qM" min="0" max="59"></label> :
+        <label>Sek. <input type="number" id="qS" min="0" max="59"></label>
+        <button id="btnCheck">Prüfen</button>
+        <button id="btnNewQuiz">Neue Aufgabe</button>
+      </div>
+      <div id="quizFeedback"></div>
+    </div>
+  </div>
+</div>
+
+<div id="tooltip"></div>
+
+<script>
+const clockRow = document.getElementById('clockRow');
+const readout = document.getElementById('readout');
+const tooltip = document.getElementById('tooltip');
+
+const units = [
+  {key:'hours',   label:'Stunden',  max:23, tensMax:2},
+  {key:'minutes', label:'Minuten',  max:59, tensMax:5},
+  {key:'seconds', label:'Sekunden', max:59, tensMax:5},
+];
+
+// Build DOM: for each unit, a panel with 4 rows, each row = leftDot, label, rightDot
+const dotRefs = {}; // dotRefs[unit][side][place] = element
+
+units.forEach(u => {
+  const panel = document.createElement('div');
+  panel.className = 'panel';
+  const h2 = document.createElement('h2');
+  h2.textContent = u.label;
+  panel.appendChild(h2);
+
+  dotRefs[u.key] = {left:{}, right:{}};
+
+  [8,4,2,1].forEach(place => {
+    const row = document.createElement('div');
+    row.className = 'bit-row';
+
+    const needsLeft = place <= u.tensMax;
+
+    let left;
+    if(needsLeft){
+      left = document.createElement('div');
+      left.className = 'dot';
+      left.dataset.unit = u.key;
+      left.dataset.side = 'left';
+      left.dataset.place = place;
+    } else {
+      left = document.createElement('div');
+      left.className = 'dot-placeholder';
+    }
+
+    const label = document.createElement('div');
+    label.className = 'place-label';
+    label.textContent = place;
+
+    const right = document.createElement('div');
+    right.className = 'dot';
+    right.dataset.unit = u.key;
+    right.dataset.side = 'right';
+    right.dataset.place = place;
+
+    row.appendChild(left);
+    row.appendChild(label);
+    row.appendChild(right);
+    panel.appendChild(row);
+
+    if(needsLeft) dotRefs[u.key].left[place] = left;
+    dotRefs[u.key].right[place] = right;
+  });
+
+  clockRow.appendChild(panel);
+});
+
+function digitsOf(value){
+  const v = Math.max(0, Math.min(99, value));
+  return { tens: Math.floor(v/10), ones: v % 10 };
+}
+
+function litColorClass(unitKey){
+  return 'lit-' + unitKey;
+}
+
+let quizMode = false;
+
+function render(h, m, s, hideDigits){
+  const values = {hours:h, minutes:m, seconds:s};
+  units.forEach(u => {
+    const {tens, ones} = digitsOf(values[u.key]);
+    [8,4,2,1].forEach(place => {
+      const rightOn = (ones & place) === place;
+      const rightEl = dotRefs[u.key].right[place];
+      rightEl.className = 'dot' + (rightOn ? ' ' + litColorClass(u.key) : '');
+      rightEl.dataset.on = rightOn ? '1':'0';
+      rightEl.dataset.digit = ones;
+
+      const leftEl = dotRefs[u.key].left[place];
+      if(leftEl){
+        const leftOn = (tens & place) === place;
+        leftEl.className = 'dot' + (leftOn ? ' ' + litColorClass(u.key) : '');
+        leftEl.dataset.on = leftOn ? '1':'0';
+        leftEl.dataset.digit = tens;
+      }
+    });
+  });
+
+  const pad = n => String(n).padStart(2,'0');
+  if(hideDigits){
+    readout.innerHTML = '<span class="digit">??</span><span class="sep">:</span><span class="digit">??</span><span class="sep">:</span><span class="digit">??</span>';
+  } else {
+    readout.textContent = `${pad(h)}:${pad(m)}:${pad(s)}`;
+  }
+}
+
+// ---- Tooltip on click ----
+clockRow.addEventListener('click', (e) => {
+  const dot = e.target.closest('.dot');
+  if(!dot) return;
+  const place = dot.dataset.place;
+  const side = dot.dataset.side === 'left' ? 'Zehner' : 'Einer';
+  const digit = dot.dataset.digit;
+  const on = dot.dataset.on === '1';
+  const unitName = {hours:'Stunden', minutes:'Minuten', seconds:'Sekunden'}[dot.dataset.unit];
+  const text = on
+    ? `${side}-Stelle der ${unitName}: Diese Kugel steht für den Wert ${place} und ist AN — sie zählt mit. Die ${side}-Ziffer ist ${digit}.`
+    : `${side}-Stelle der ${unitName}: Diese Kugel steht für den Wert ${place}, ist aber AUS — sie zählt nicht mit. Die ${side}-Ziffer ist ${digit}.`;
+  tooltip.textContent = text;
+  const rect = dot.getBoundingClientRect();
+  tooltip.style.left = Math.min(window.innerWidth-240, rect.left) + 'px';
+  tooltip.style.top = (rect.top - 70) + 'px';
+  tooltip.classList.add('show');
+  clearTimeout(tooltip._t);
+  tooltip._t = setTimeout(() => tooltip.classList.remove('show'), 3200);
+});
+
+// ---- Mode switching ----
+const btnLive = document.getElementById('btnLive');
+const btnManual = document.getElementById('btnManual');
+const btnQuiz = document.getElementById('btnQuiz');
+const bodyLive = document.getElementById('bodyLive');
+const bodyManual = document.getElementById('bodyManual');
+const bodyQuiz = document.getElementById('bodyQuiz');
+
+let liveTimer = null;
+
+function setMode(mode){
+  quizMode = (mode === 'quiz');
+  [btnLive, btnManual, btnQuiz].forEach(b => b.classList.remove('active'));
+  [bodyLive, bodyManual, bodyQuiz].forEach(b => b.classList.remove('show'));
+  clearInterval(liveTimer);
+  readout.classList.remove('hidden-value');
+
+  if(mode === 'live'){
+    btnLive.classList.add('active');
+    bodyLive.classList.add('show');
+    tick();
+    liveTimer = setInterval(tick, 1000);
+  } else if(mode === 'manual'){
+    btnManual.classList.add('active');
+    bodyManual.classList.add('show');
+    applyManual();
+  } else {
+    btnQuiz.classList.add('active');
+    bodyQuiz.classList.add('show');
+    newQuiz();
+  }
+}
+
+function tick(){
+  const now = new Date();
+  render(now.getHours(), now.getMinutes(), now.getSeconds(), false);
+}
+
+function applyManual(){
+  const h = parseInt(document.getElementById('inH').value) || 0;
+  const m = parseInt(document.getElementById('inM').value) || 0;
+  const s = parseInt(document.getElementById('inS').value) || 0;
+  render(Math.min(23,h), Math.min(59,m), Math.min(59,s), false);
+}
+
+let quizAnswer = {h:0,m:0,s:0};
+function newQuiz(){
+  quizAnswer = {
+    h: Math.floor(Math.random()*24),
+    m: Math.floor(Math.random()*60),
+    s: Math.floor(Math.random()*60),
+  };
+  render(quizAnswer.h, quizAnswer.m, quizAnswer.s, true);
+  document.getElementById('qH').value = '';
+  document.getElementById('qM').value = '';
+  document.getElementById('qS').value = '';
+  document.getElementById('quizFeedback').textContent = '';
+  document.getElementById('quizFeedback').className = '';
+}
+
+function checkQuiz(){
+  const h = parseInt(document.getElementById('qH').value);
+  const m = parseInt(document.getElementById('qM').value);
+  const s = parseInt(document.getElementById('qS').value);
+  const fb = document.getElementById('quizFeedback');
+  if(h === quizAnswer.h && m === quizAnswer.m && s === quizAnswer.s){
+    fb.textContent = 'Richtig! Genau ' + String(quizAnswer.h).padStart(2,'0') + ':' + String(quizAnswer.m).padStart(2,'0') + ':' + String(quizAnswer.s).padStart(2,'0') + '.';
+    fb.className = 'ok';
+    render(quizAnswer.h, quizAnswer.m, quizAnswer.s, false);
+  } else {
+    fb.textContent = 'Noch nicht richtig — schau dir die Kugeln nochmal an und rechne die Werte zusammen.';
+    fb.className = 'bad';
+  }
+}
+
+btnLive.addEventListener('click', () => setMode('live'));
+btnManual.addEventListener('click', () => setMode('manual'));
+btnQuiz.addEventListener('click', () => setMode('quiz'));
+document.getElementById('btnSetManual').addEventListener('click', applyManual);
+document.getElementById('btnCheck').addEventListener('click', checkQuiz);
+document.getElementById('btnNewQuiz').addEventListener('click', newQuiz);
+
+setMode('live');
+</script>
+</body>
+</html>
